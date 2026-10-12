@@ -12,10 +12,19 @@ Data scraped from [NC Drinking Water Watch](https://www.pwss.enr.state.nc.us/NCD
 
 ## Data
 
-See `data/` (added once the run completes).
+All files cover 2021-10-11 to 2026-10-11.
 
-- `noncoliform_results_with_concentrations` — one row per sample × analyte: water system, lab sample no., collection date, analyte, method, non-detect flag, concentration + unit, reporting level + unit, monitoring period.
-- `noncoliform_by_analyte` — sample counts by county and analyte (no concentrations).
+| County | Samples | Results | Detects (with a value) |
+|---|---|---|---|
+| Chatham | 1,824 | 9,733 | 4,639 |
+| Durham | 5,776 | 25,545 | 15,025 |
+| Orange | 7,146 | 19,862 | 9,793 |
+| Wake | 36,193 | 164,832 | 42,458 |
+
+Results per county match the site's by-analyte sample listings exactly.
+
+- `noncoliform_results_with_concentrations.csv` / `.xlsx` — one row per sample × analyte: water system, lab sample no., collection date, analyte, method, non-detect flag, concentration + unit, reporting level + unit, monitoring period.
+- `noncoliform_by_analyte.xlsx` / `noncoliform_samples_all_counties.csv` — the by-analyte sample listings and counts by county and analyte (no concentrations).
 
 ### Notes
 
