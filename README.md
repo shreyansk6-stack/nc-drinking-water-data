@@ -2,6 +2,15 @@
 
 Data scraped from [NC Drinking Water Watch](https://www.pwss.enr.state.nc.us/NCDWW2/) (NC DEQ Public Water Supply Section).
 
+## Download
+
+The files are too large for GitHub to preview in the browser; these links download them directly.
+
+- **[noncoliform_results_with_concentrations.xlsx](https://github.com/shreyansk6-stack/nc-drinking-water-data/raw/main/data/noncoliform_results_with_concentrations.xlsx)** (17 MB) — main file: every result with concentrations; Summary sheet + one sheet per county
+- [noncoliform_results_with_concentrations.csv](https://github.com/shreyansk6-stack/nc-drinking-water-data/raw/main/data/noncoliform_results_with_concentrations.csv) (35 MB) — same data as one CSV
+- [noncoliform_by_analyte.xlsx](https://github.com/shreyansk6-stack/nc-drinking-water-data/raw/main/data/noncoliform_by_analyte.xlsx) (11 MB) — sample counts by analyte and county
+- [noncoliform_samples_all_counties.csv](https://github.com/shreyansk6-stack/nc-drinking-water-data/raw/main/data/noncoliform_samples_all_counties.csv) (20 MB) — the sample list behind those counts
+
 ## Scope
 
 - **Search:** Non-Coliform Samples [By Analyte]
