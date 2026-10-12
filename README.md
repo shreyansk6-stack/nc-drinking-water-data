@@ -19,7 +19,10 @@ See `data/` (added once the run completes).
 
 ### Notes
 
-- A **non-detect** (`Non-Detect = True`, the site's "Less than Indicator" = Y) has no concentration; the reporting level is the detection limit it was below.
+- A **non-detect** (`Non-Detect = True`, the site's "Less than Indicator" = Y) has no concentration value; the reporting level is the detection limit it was below. The site records some non-detects with a concentration of "0" (e.g. nitrate-nitrite, HAA5, TTHM) or a bare unit (PFAS); those are blanked in `Concentration Value` and kept as-is in the raw `Concentration` column.
+- Each sample's results page also lists coliform analytes (Coliform TCR 3100, E. coli 3014). These are dropped, matching the site's non-coliform search. Every remaining result matches a sample-analyte pair in the site's by-analyte search (checked by the site's internal sample ID).
+- Heterotrophic bacteria (HPC) results have no concentration on the site.
+- Some labs reuse a lab sample number for different samples on the same day; use `Sample ID` (the site's internal ID) to identify a sample uniquely.
 - For a few radionuclides in Wake and Durham, the site's analyte list reports slightly more samples than its own per-analyte sample page returns (e.g. Wake Radium-226: 3,054 vs 3,030 over 2010–2026). The data here matches the sample pages.
 - Inactive water systems are not included.
 
@@ -33,11 +36,11 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # 1. analyte lists + per-analyte sample lists (~450 pages)
 .venv/bin/python scripts/scrape_ncdww.py run
 # 2. clean sample-by-analyte tables
-.venv/bin/python scripts/parse_ncdww.py run data
+.venv/bin/python scripts/parse_ncdww.py run data 2021-10-11
 # 3. per-sample result pages (concentrations); resumable, ~8 pages/s
 .venv/bin/python scripts/fetch_results.py run run/concentrations_work
 # 4. combine into CSV + Excel
-.venv/bin/python scripts/build_results.py run/concentrations_work data
+.venv/bin/python scripts/build_results.py run run/concentrations_work data
 ```
 
 Counties and dates are set at the top of `scrape_ncdww.py` (`COUNTIES`, `BEGIN`, `END`) and `fetch_results.py` (`MIN_DATE`).

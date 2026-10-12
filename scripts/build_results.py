@@ -1,11 +1,22 @@
 """Combine fetched per-sample results into CSV + Excel.
 
-Usage: python build_results.py WORK_DIR OUT_DIR
+Usage: python build_results.py RUN_DIR WORK_DIR OUT_DIR
+(RUN_DIR holds the by-analyte pages from scrape_ncdww.py; WORK_DIR the output of fetch_results.py)
 """
 import json, os, re, sys
 import pandas as pd
 
-work, out = sys.argv[1], sys.argv[2]
+run, work, out = sys.argv[1], sys.argv[2], sys.argv[3]
+COLIFORM = {"3100", "3013", "3014"}  # coliform analytes; the site's non-coliform searches exclude these
+
+# (sample id, analyte code) pairs shown by the site's Non-Coliform [By Analyte] search
+listed = set()
+for county in ["CHATHAM", "DURHAM", "ORANGE", "WAKE"]:
+    folder = os.path.join(run, "raw", county)
+    for f in os.listdir(folder):
+        if f[0].isdigit():
+            for m in re.finditer(r"tsasampl_is_number=(\d+)", open(os.path.join(folder, f)).read()):
+                listed.add((m.group(1), f[:-5]))
 recs = []
 for county in ["CHATHAM", "DURHAM", "ORANGE", "WAKE"]:
     p = os.path.join(work, f"{county}.jsonl")
@@ -19,6 +30,9 @@ for county in ["CHATHAM", "DURHAM", "ORANGE", "WAKE"]:
 
 d = pd.DataFrame(recs)
 d = d.drop_duplicates()
+d = d[~d["Analyte Code"].isin(COLIFORM)]
+d["In By-Analyte Search"] = [(s, a) in listed for s, a in zip(d["Sample ID"], d["Analyte Code"])]
+d["Reporting Level"] = d["Reporting Level"].replace("null null", "")
 
 
 def split_unit(v):
@@ -29,12 +43,15 @@ def split_unit(v):
 d[["Concentration Value", "Concentration Unit"]] = d["Concentration"].apply(lambda v: pd.Series(split_unit(v)))
 d[["Reporting Level Value", "Reporting Level Unit"]] = d["Reporting Level"].apply(lambda v: pd.Series(split_unit(v)))
 d["Non-Detect"] = d["Less Than Indicator"].eq("Y")
+# the site records some non-detects as "0" or as a bare unit; they are not measurements
+d.loc[d["Non-Detect"], "Concentration Value"] = None
+d.loc[d["Concentration Unit"].eq(""), "Concentration Unit"] = d["Reporting Level Unit"]
 for c in ["Collection Date", "Monitoring Period Begin", "Monitoring Period End"]:
     d[c] = pd.to_datetime(d[c], format="%m-%d-%Y", errors="coerce")
 d = d[d["Collection Date"].between("2021-10-11", "2026-10-11")]  # last 5 years
 
 d = d[["Principal County Served", "Water System No.", "Water System Name", "Lab Sample No.", "Sample ID",
-       "Collection Date", "Analyte Code", "Analyte Name", "Method Code", "Non-Detect",
+       "Collection Date", "Analyte Code", "Analyte Name", "In By-Analyte Search", "Method Code", "Non-Detect",
        "Concentration Value", "Concentration Unit", "Reporting Level Value", "Reporting Level Unit",
        "Level Type", "Concentration", "Reporting Level", "Monitoring Period Begin", "Monitoring Period End",
        "Search County"]]
@@ -42,7 +59,7 @@ d = d.sort_values(["Principal County Served", "Analyte Name", "Water System No."
 
 summary = (d.groupby(["Principal County Served", "Analyte Code", "Analyte Name"])
            .agg(Results=("Sample ID", "size"),
-                Detects=("Non-Detect", lambda x: int((~x).sum())),
+                Detects=("Concentration Value", "count"),
                 Water_Systems=("Water System No.", "nunique"),
                 Unit=("Concentration Unit", lambda x: ", ".join(sorted(set(u for u in x if u)))),
                 Min_Detected=("Concentration Value", "min"),
@@ -76,7 +93,8 @@ print(d.shape)
 print(d.groupby("Principal County Served").agg(results=("Sample ID", "size"), samples=("Sample ID", "nunique"),
                                                detects=("Non-Detect", lambda x: int((~x).sum()))))
 print("county mismatch rows:", int((d["Principal County Served"] != d["Search County"]).sum()))
-print("unparsed concentrations:", int((d["Concentration"].ne("") & d["Concentration Value"].isna()).sum()))
-print("non-detects with a concentration:", int((d["Non-Detect"] & d["Concentration Value"].notna()).sum()))
-print("detects without a concentration:", int((~d["Non-Detect"] & d["Concentration Value"].isna()).sum()))
+print("unparsed detect concentrations:", int((~d["Non-Detect"] & d["Concentration"].ne("") & d["Concentration Value"].isna()).sum()))
+print("not in by-analyte search:", int((~d["In By-Analyte Search"]).sum()))
+print("detects without a concentration:",
+      d[~d["Non-Detect"] & d["Concentration Value"].isna()]["Analyte Name"].value_counts().to_dict())
 print(d["Concentration Unit"].value_counts().head(15))

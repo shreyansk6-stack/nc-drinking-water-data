@@ -1,11 +1,12 @@
 """Re-parse saved NCDWW pages into a clean CSV + Excel workbook.
 
-Usage: python parse_ncdww.py RUN_DIR OUT_DIR
+Usage: python parse_ncdww.py RUN_DIR OUT_DIR [MIN_DATE YYYY-MM-DD]
 """
 import io, os, re, sys
 import pandas as pd
 
 run, out = sys.argv[1], sys.argv[2]
+min_date = sys.argv[3] if len(sys.argv) > 3 else None
 os.makedirs(out, exist_ok=True)
 
 
@@ -45,6 +46,8 @@ s = s[["Principal County Served", "Analyte Code", "Analyte Name", "Analyte Type"
        "Collection Date", "Sampling Point"]]
 s = s.rename(columns={"Type": "Sample Type"})
 s["Collection Date"] = pd.to_datetime(s["Collection Date"], format="%m-%d-%Y")
+if min_date:
+    s = s[s["Collection Date"] >= min_date]
 c = pd.DataFrame(checks)
 c["Rows parsed"] = c["Rows parsed"].astype(int)
 c["Samples (site count)"] = c["Samples (site count)"].astype(int)
@@ -65,8 +68,10 @@ summary = summary.merge(
         ["Principal County Served", "Analyte Code", "Samples (site count)"]],
     on=["Principal County Served", "Analyte Code"])
 summary["Note"] = summary.apply(
-    lambda r: "" if r["Samples"] == r["Samples (site count)"] else
+    lambda r: "" if min_date or r["Samples"] == r["Samples (site count)"] else
     "Site's analyte list count differs from rows on its sample page", axis=1)
+if min_date:  # site counts cover the whole scrape window, not the filtered one
+    summary = summary.drop(columns=["Samples (site count)", "Note"])
 wide = summary.pivot_table(index=["Analyte Code", "Analyte Name", "Analyte Type"],
                            columns="Principal County Served", values="Samples",
                            fill_value=0).reset_index()
@@ -75,10 +80,10 @@ wide.columns.name = None
 s.to_csv(os.path.join(out, "noncoliform_samples_all_counties.csv"), index=False)
 with pd.ExcelWriter(os.path.join(out, "noncoliform_by_analyte.xlsx"), engine="openpyxl",
                     datetime_format="yyyy-mm-dd") as xw:
-    wide.to_excel(xw, "Counts by county", index=False)
-    summary.to_excel(xw, "Summary", index=False)
+    wide.to_excel(xw, sheet_name="Counts by county", index=False)
+    summary.to_excel(xw, sheet_name="Summary", index=False)
     for county, g in s.groupby("Principal County Served"):
-        g.sort_values(["Analyte Name", "Collection Date"]).to_excel(xw, county.title(), index=False)
+        g.sort_values(["Analyte Name", "Collection Date"]).to_excel(xw, sheet_name=county.title(), index=False)
     for ws in xw.book.worksheets:
         ws.freeze_panes = "A2"
         ws.auto_filter.ref = ws.dimensions
@@ -86,4 +91,5 @@ with pd.ExcelWriter(os.path.join(out, "noncoliform_by_analyte.xlsx"), engine="op
             w = max(len(str(col[0].value)), *(len(str(c.value)) for c in col[1:200] if c.value is not None))
             ws.column_dimensions[col[0].column_letter].width = min(w + 2, 45)
 print(summary.groupby("Principal County Served")[["Samples"]].sum())
-print(summary[summary["Note"] != ""][["Principal County Served", "Analyte Name", "Samples", "Samples (site count)"]].to_string())
+if not min_date:
+    print(summary[summary["Note"] != ""][["Principal County Served", "Analyte Name", "Samples", "Samples (site count)"]].to_string())

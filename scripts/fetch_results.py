@@ -4,7 +4,7 @@ Usage: python fetch_results.py RUN_DIR WORK_DIR
 Resumable: appends parsed rows to WORK_DIR/<county>.jsonl and skips sample ids already done.
 """
 import datetime as dt, json, os, re, sys, threading, time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from lxml import html as lh
 from curl_cffi import requests
 
@@ -53,7 +53,7 @@ def fetch(sid, link):
         if wait > 0:
             time.sleep(wait)
         try:
-            r = tls.s.get(url, timeout=90)
+            r = tls.s.get(url, timeout=45)
             if r.status_code == 200 and "Non-Coliform Sample" in r.text:
                 time.sleep(DELAY)
                 return r.text
@@ -98,15 +98,17 @@ for county in COUNTIES:
         return sid, {"sample_id": sid, "county": county, "head": head, "rows": rows,
                      "site_total": total, "parsed": len(rows)}
 
+    # write each sample as soon as it finishes so one slow page doesn't hold up the rest
     with ThreadPoolExecutor(WORKERS) as ex:
-        for sid, rec in ex.map(job, todo):
+        for fut in as_completed([ex.submit(job, item) for item in todo]):
+            sid, rec = fut.result()
             if rec is None:
                 print(f"  GAVE UP on sample {sid}", flush=True)
                 continue
             out.write(json.dumps(rec) + "\n")
+            out.flush()
             n += 1
             if n % 500 == 0:
-                out.flush()
                 rate = n / (time.time() - t0)
                 print(f"  {county}: {n}/{len(todo)}  {rate:.1f}/s  ~{(len(todo) - n) / rate / 60:.0f} min left",
                       flush=True)
